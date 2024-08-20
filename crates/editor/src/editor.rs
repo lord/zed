@@ -14918,7 +14918,7 @@ impl RowExt for MultiBufferRow {
     }
 }
 
-trait RowRangeExt {
+pub trait RowRangeExt {
     type Row;
 
     fn len(&self) -> usize;

@@ -120,7 +120,7 @@ pub(crate) fn up_by_rows(
     preserve_column_at_start: bool,
     text_layout_details: &TextLayoutDetails,
 ) -> (DisplayPoint, SelectionGoal) {
-    let mut goal_x = match goal {
+    let goal_x = match goal {
         SelectionGoal::HorizontalPosition(x) => x.into(),
         SelectionGoal::WrappedHorizontalPosition((_, x)) => x.into(),
         SelectionGoal::HorizontalRange { end, .. } => end.into(),
@@ -138,7 +138,6 @@ pub(crate) fn up_by_rows(
         return (start, goal);
     } else {
         point = DisplayPoint::new(DisplayRow(0), 0);
-        goal_x = px(0.);
     }
 
     let mut clipped_point = map.clip_point(point, Bias::Left);
@@ -159,7 +158,7 @@ pub(crate) fn down_by_rows(
     preserve_column_at_end: bool,
     text_layout_details: &TextLayoutDetails,
 ) -> (DisplayPoint, SelectionGoal) {
-    let mut goal_x = match goal {
+    let goal_x = match goal {
         SelectionGoal::HorizontalPosition(x) => x.into(),
         SelectionGoal::WrappedHorizontalPosition((_, x)) => x.into(),
         SelectionGoal::HorizontalRange { end, .. } => end.into(),
@@ -174,7 +173,6 @@ pub(crate) fn down_by_rows(
         return (start, goal);
     } else {
         point = map.max_point();
-        goal_x = map.x_for_display_point(point, text_layout_details)
     }
 
     let mut clipped_point = map.clip_point(point, Bias::Right);
