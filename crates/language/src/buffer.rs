@@ -229,6 +229,8 @@ pub enum CursorShape {
     Underline,
     /// A box drawn around the following character
     Hollow,
+    /// A vertical bar that is drawn wider than a regular bar
+    WideBar,
 }
 
 impl From<settings::CursorShape> for CursorShape {

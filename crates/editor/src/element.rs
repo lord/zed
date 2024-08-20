@@ -11901,7 +11901,11 @@ impl CursorLayout {
         match self.shape {
             CursorShape::Bar => Bounds {
                 origin: self.origin + origin,
-                size: size(px(2.0), self.line_height),
+                size: size(px(1.0), self.line_height),
+            },
+            CursorShape::WideBar => Bounds {
+                origin: self.origin + origin - point(px(1.0), Pixels::ZERO),
+                size: size(px(3.0), self.line_height),
             },
             CursorShape::Block | CursorShape::Hollow => Bounds {
                 origin: self.origin + origin,
