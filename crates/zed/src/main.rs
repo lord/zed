@@ -492,6 +492,7 @@ fn main() {
         channel::init(&app_state.client.clone(), app_state.user_store.clone(), cx);
         search::init(cx);
         vim::init(cx);
+        dance::init(cx);
         terminal_view::init(cx);
         journal::init(app_state.clone(), cx);
         language_selector::init(cx);

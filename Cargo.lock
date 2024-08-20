@@ -3596,6 +3596,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "dance"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-compat",
+ "async-trait",
+ "collections",
+ "command_palette",
+ "command_palette_hooks",
+ "editor",
+ "futures 0.3.30",
+ "gpui",
+ "indoc",
+ "itertools 0.11.0",
+ "language",
+ "lazy_static",
+ "log",
+ "lsp",
+ "multi_buffer",
+ "nvim-rs",
+ "parking_lot",
+ "regex",
+ "release_channel",
+ "schemars",
+ "search",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "settings",
+ "text",
+ "tokio",
+ "ui",
+ "util",
+ "workspace",
+ "zed_actions",
+]
+
+[[package]]
 name = "dashmap"
 version = "5.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16439,6 +16477,7 @@ dependencies = [
  "command_palette",
  "command_palette_hooks",
  "copilot",
+ "dance",
  "db",
  "diagnostics",
  "editor",

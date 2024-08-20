@@ -129,6 +129,7 @@ uuid.workspace = true
 vcs_menu.workspace = true
 vim.workspace = true
 vim_mode_setting.workspace = true
+dance.workspace = true
 welcome.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
