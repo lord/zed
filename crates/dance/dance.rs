@@ -1,23 +1,8 @@
-use anyhow::Result;
-use collections::HashMap;
-use command_palette_hooks::{CommandPaletteFilter, CommandPaletteInterceptor};
-use editor::{
-    movement::{self, FindRange},
-    Anchor, Bias, Editor, EditorEvent, EditorMode, ToPoint,
-};
+use editor::Editor;
 use gpui::KeyContext;
-use gpui::{
-    actions, impl_actions, Action, AppContext, EntityId, FocusableView, Global, KeystrokeEvent,
-    Subscription, UpdateGlobal, View, ViewContext, WeakView, WindowContext,
-};
-use language::{CursorShape, Point, SelectionGoal, TransactionId};
-use schemars::JsonSchema;
+use gpui::{impl_actions, AppContext, ViewContext, WindowContext};
+use language::CursorShape;
 use serde::Deserialize;
-use serde_derive::Serialize;
-use settings::{update_settings_file, Settings, SettingsSources, SettingsStore};
-use std::{ops::Range, sync::Arc};
-use ui::BorrowAppContext;
-use workspace::{self, Workspace};
 
 struct DanceTag;
 
