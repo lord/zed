@@ -137,6 +137,7 @@ vim.workspace = true
 vim_mode_setting.workspace = true
 web_search.workspace = true
 web_search_providers.workspace = true
+dance.workspace = true
 welcome.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
