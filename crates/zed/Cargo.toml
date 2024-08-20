@@ -65,7 +65,7 @@ log.workspace = true
 markdown_preview.workspace = true
 menu.workspace = true
 mimalloc = { version = "0.1", optional = true }
-nix = {workspace = true, features = ["pthread", "signal"] }
+nix = { workspace = true, features = ["pthread", "signal"] }
 node_runtime.workspace = true
 notifications.workspace = true
 outline.workspace = true
@@ -107,6 +107,7 @@ ui.workspace = true
 util.workspace = true
 uuid.workspace = true
 vim.workspace = true
+dance.workspace = true
 welcome.workspace = true
 workspace.workspace = true
 zed_actions.workspace = true
