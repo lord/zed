@@ -26,7 +26,6 @@ fn make_key_context(mode: String) -> KeyContext {
 fn register(editor: &mut Editor, cx: &mut ViewContext<Editor>) {
     let editor_handle = cx.view().downgrade();
     editor.set_keymap_context_layer::<DanceTag>(make_key_context("default".to_string()), cx);
-    editor.set_cursor_shape(CursorShape::WideBar, cx);
     editor
         .register_action(
             move |&SwitchMode(ref mode): &SwitchMode, cx: &mut WindowContext| {
