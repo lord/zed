@@ -174,6 +174,8 @@ pub enum CursorShape {
     Underscore,
     /// A box drawn around the following character
     Hollow,
+    /// A vertical bar that is drawn wider than a regular bar
+    WideBar,
 }
 
 #[derive(Clone, Debug)]

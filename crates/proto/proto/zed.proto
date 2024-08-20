@@ -1868,6 +1868,7 @@ enum CursorShape {
     CursorBlock = 1;
     CursorUnderscore = 2;
     CursorHollow = 3;
+    CursorWideBar = 1001;
 }
 
 message ExcerptInsertion {
