@@ -1,16 +1,14 @@
 use editor::actions::{Backspace, NewlineAbove, NewlineBelow, Paste};
-use editor::display_map::DisplaySnapshot;
 use editor::scroll::Autoscroll;
 use editor::Editor;
+use editor::{RowExt, RowRangeExt};
 use gpui::{actions, impl_actions, AppContext, ClipboardEntry, ViewContext, WindowContext};
 use gpui::{Action, KeyContext};
 use language::{CursorShape, Point};
 use multi_buffer::{MultiBufferRow, ToPoint};
 use serde::Deserialize;
-use std::cmp;
 use std::iter::Iterator;
 use std::ops::Range;
-use text::Selection;
 
 struct DanceTag;
 
@@ -18,7 +16,7 @@ struct DanceTag;
 struct SwitchMode(String);
 
 impl_actions!(dance, [SwitchMode,]);
-actions!(dance, [SelectLine, PasteAbove, PasteBelow,]);
+actions!(dance, [SelectLine, PasteAbove, PasteBelow, JoinLines,]);
 
 /// Initializes the `vim` crate.
 pub fn init(cx: &mut AppContext) {
@@ -35,7 +33,9 @@ fn make_key_context(mode: String) -> KeyContext {
 /// this is a custom implementation of line selection:
 /// - it places the caret at the beginning, which looks nicer
 /// - it don't extend the selection to the subsequent line if the selection has nonzero length
-///   and the end of the selection sits at the very start of the next line
+///   AND the end of the selection sits at the very start of the next line AND the selection caret
+///   is at the beginning of the selection. this makes the operation idempotent but also behaves like
+///   how a user might expect
 fn select_line(editor: &mut Editor, _: &SelectLine, cx: &mut ViewContext<Editor>) {
     let display_map = editor.display_map.update(cx, |map, cx| map.snapshot(cx));
     let mut selections = editor.selections.all::<Point>(cx);
@@ -44,7 +44,7 @@ fn select_line(editor: &mut Editor, _: &SelectLine, cx: &mut ViewContext<Editor>
         let rows = {
             let start = selection.start.to_point(&display_map.buffer_snapshot);
             let mut end = selection.end.to_point(&display_map.buffer_snapshot);
-            if start.row != end.row && end.column == 0 {
+            if start.row != end.row && end.column == 0 && selection.reversed == true {
                 end.row -= 1;
             }
 
@@ -105,6 +105,76 @@ fn paste_below(editor: &mut Editor, _: &PasteBelow, cx: &mut ViewContext<Editor>
     }
 }
 
+/// A custom implementation of join_lines that selects the space between lines
+pub fn join_lines(editor: &mut Editor, _: &JoinLines, cx: &mut ViewContext<Editor>) {
+    if editor.read_only(cx) {
+        return;
+    }
+    let mut row_ranges = Vec::<Range<MultiBufferRow>>::new();
+    for selection in editor.selections.all::<Point>(cx) {
+        let start = MultiBufferRow(selection.start.row);
+        let end = if selection.start.row == selection.end.row {
+            MultiBufferRow(selection.start.row + 1)
+        } else {
+            MultiBufferRow(selection.end.row)
+        };
+
+        if let Some(last_row_range) = row_ranges.last_mut() {
+            if start <= last_row_range.end {
+                last_row_range.end = end;
+                continue;
+            }
+        }
+        row_ranges.push(start..end);
+    }
+
+    let snapshot = editor.buffer().read(cx).snapshot(cx);
+    editor.transact(cx, |this, cx| {
+        let mut cursor_positions = Vec::new();
+        // for row_range in row_ranges.iter().rev() {
+        //     println!("{:?}   {:?}", row_range, row_range.end.previous_row());
+        //     let anchor = snapshot.anchor_before(Point::new(
+        //         row_range.end.previous_row().0,
+        //         snapshot.line_len(row_range.end.previous_row()),
+        //     ));
+        //     cursor_positions.push(anchor..anchor);
+        // }
+
+        for row_range in row_ranges.into_iter().rev() {
+            for row in row_range.iter_rows().rev() {
+                {
+                    let start = snapshot.anchor_before(Point::new(row.0, snapshot.line_len(row)));
+                    // let end = snapshot.anchor_before(Point::new(row.next_row().0, 0));
+                    cursor_positions.push(start..start);
+                }
+
+                println!("{:?}", row);
+                let end_of_line = Point::new(row.0, snapshot.line_len(row));
+                let next_line_row = row.next_row();
+                let indent = snapshot.indent_size_for_line(next_line_row);
+                let start_of_next_line = Point::new(next_line_row.0, indent.len);
+
+                let replace = if snapshot.line_len(next_line_row) > indent.len {
+                    " "
+                } else {
+                    ""
+                };
+
+                this.buffer().update(cx, |buffer, cx| {
+                    buffer.edit([(end_of_line..start_of_next_line, replace)], None, cx)
+                });
+            }
+        }
+
+        // it's important that cursor positions are in increasing order
+        cursor_positions.reverse();
+
+        this.change_selections(Some(Autoscroll::fit()), cx, |s| {
+            s.select_anchor_ranges(cursor_positions)
+        });
+    });
+}
+
 fn switch_mode(
     editor: &mut Editor,
     &SwitchMode(ref mode): &SwitchMode,
@@ -147,4 +217,5 @@ fn register(editor: &mut Editor, cx: &mut ViewContext<Editor>) {
     register_editor_action(editor, cx, switch_mode);
     register_editor_action(editor, cx, paste_above);
     register_editor_action(editor, cx, paste_below);
+    register_editor_action(editor, cx, join_lines);
 }
