@@ -32,6 +32,10 @@ fn make_key_context(mode: String) -> KeyContext {
     key_context
 }
 
+/// this is a custom implementation of line selection:
+/// - it places the caret at the beginning, which looks nicer
+/// - it don't extend the selection to the subsequent line if the selection has nonzero length
+///   and the end of the selection sits at the very start of the next line
 fn select_line(editor: &mut Editor, _: &SelectLine, cx: &mut ViewContext<Editor>) {
     let display_map = editor.display_map.update(cx, |map, cx| map.snapshot(cx));
     let mut selections = editor.selections.all::<Point>(cx);
@@ -73,6 +77,9 @@ fn clipboard_ends_in_newline(cx: &mut ViewContext<Editor>) -> bool {
     }
 }
 
+/// this is a custom implementation of paste that, if the clipboard contains a newline,
+/// it will paste on a newly created line above the selection instead of replacing
+/// the selection
 fn paste_above(editor: &mut Editor, _: &PasteAbove, cx: &mut ViewContext<Editor>) {
     let ends_in_newline = clipboard_ends_in_newline(cx);
     if ends_in_newline {
@@ -84,6 +91,9 @@ fn paste_above(editor: &mut Editor, _: &PasteAbove, cx: &mut ViewContext<Editor>
     }
 }
 
+/// this is a custom implementation of paste that, if the clipboard contains a newline,
+/// it will paste on a newly created line below the selection instead of replacing
+/// the selection
 fn paste_below(editor: &mut Editor, _: &PasteBelow, cx: &mut ViewContext<Editor>) {
     let ends_in_newline = clipboard_ends_in_newline(cx);
     if ends_in_newline {
