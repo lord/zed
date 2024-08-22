@@ -140,7 +140,6 @@ pub(crate) fn up_by_rows(
         return (start, goal);
     } else {
         point = DisplayPoint::new(DisplayRow(0), 0);
-        goal_x = px(0.);
     }
 
     let mut clipped_point = map.clip_point(point, Bias::Left);
@@ -176,7 +175,6 @@ pub(crate) fn down_by_rows(
         return (start, goal);
     } else {
         point = map.max_point();
-        goal_x = map.x_for_display_point(point, text_layout_details)
     }
 
     let mut clipped_point = map.clip_point(point, Bias::Right);
