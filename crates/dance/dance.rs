@@ -144,11 +144,10 @@ pub fn join_lines(editor: &mut Editor, _: &JoinLines, cx: &mut ViewContext<Edito
             for row in row_range.iter_rows().rev() {
                 {
                     let start = snapshot.anchor_before(Point::new(row.0, snapshot.line_len(row)));
-                    // let end = snapshot.anchor_before(Point::new(row.next_row().0, 0));
-                    cursor_positions.push(start..start);
+                    let end = snapshot.anchor_before(Point::new(row.next_row().0, 0));
+                    cursor_positions.push(start..end);
                 }
 
-                println!("{:?}", row);
                 let end_of_line = Point::new(row.0, snapshot.line_len(row));
                 let next_line_row = row.next_row();
                 let indent = snapshot.indent_size_for_line(next_line_row);
