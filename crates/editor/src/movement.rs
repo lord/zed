@@ -122,7 +122,7 @@ pub(crate) fn up_by_rows(
     preserve_column_at_start: bool,
     text_layout_details: &TextLayoutDetails,
 ) -> (DisplayPoint, SelectionGoal) {
-    let mut goal_x = match goal {
+    let goal_x = match goal {
         SelectionGoal::HorizontalPosition(x) => x.into(),
         SelectionGoal::WrappedHorizontalPosition((_, x)) => x.into(),
         SelectionGoal::HorizontalRange { end, .. } => end.into(),
@@ -160,7 +160,7 @@ pub(crate) fn down_by_rows(
     preserve_column_at_end: bool,
     text_layout_details: &TextLayoutDetails,
 ) -> (DisplayPoint, SelectionGoal) {
-    let mut goal_x = match goal {
+    let goal_x = match goal {
         SelectionGoal::HorizontalPosition(x) => x.into(),
         SelectionGoal::WrappedHorizontalPosition((_, x)) => x.into(),
         SelectionGoal::HorizontalRange { end, .. } => end.into(),
