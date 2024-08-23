@@ -1,6 +1,6 @@
 use editor::actions::{Backspace, NewlineAbove, NewlineBelow, Paste};
 use editor::scroll::Autoscroll;
-use editor::Editor;
+use editor::{DisplayPoint, Editor};
 use editor::{RowExt, RowRangeExt};
 use gpui::{actions, impl_actions, AppContext, ClipboardEntry, ViewContext, WindowContext};
 use gpui::{Action, KeyContext};
@@ -9,6 +9,7 @@ use multi_buffer::{MultiBufferRow, ToPoint};
 use serde::Deserialize;
 use std::iter::Iterator;
 use std::ops::Range;
+use text::SelectionGoal;
 
 struct DanceTag;
 
@@ -16,7 +17,17 @@ struct DanceTag;
 struct SwitchMode(String);
 
 impl_actions!(dance, [SwitchMode,]);
-actions!(dance, [SelectLine, PasteAbove, PasteBelow, JoinLines,]);
+actions!(
+    dance,
+    [
+        SelectLine,
+        PasteAbove,
+        PasteBelow,
+        JoinLines,
+        MoveToBeginningOfLine,
+        MoveToEndOfLine,
+    ]
+);
 
 /// Initializes the `vim` crate.
 pub fn init(cx: &mut AppContext) {
@@ -187,6 +198,52 @@ fn switch_mode(
     }
 }
 
+fn all_selections_are_empty(editor: &Editor, cx: &AppContext) -> bool {
+    editor
+        .selections
+        .all::<usize>(cx)
+        .iter()
+        .all(|s| s.is_empty())
+}
+
+fn move_to_beginning_of_line(
+    editor: &mut Editor,
+    _: &MoveToBeginningOfLine,
+    cx: &mut ViewContext<Editor>,
+) {
+    if all_selections_are_empty(editor, &*cx) {
+        editor.move_to_beginning_of_line(
+            &editor::actions::MoveToBeginningOfLine {
+                stop_at_soft_wraps: false,
+            },
+            cx,
+        )
+    } else {
+        editor.change_selections(Some(Autoscroll::fit()), cx, |s| {
+            s.move_with(|_, selection| {
+                selection.collapse_to(selection.start, SelectionGoal::None);
+            });
+        })
+    }
+}
+
+fn move_to_end_of_line(editor: &mut Editor, _: &MoveToEndOfLine, cx: &mut ViewContext<Editor>) {
+    if all_selections_are_empty(editor, &*cx) {
+        editor.move_to_end_of_line(
+            &editor::actions::MoveToEndOfLine {
+                stop_at_soft_wraps: false,
+            },
+            cx,
+        )
+    } else {
+        editor.change_selections(Some(Autoscroll::fit()), cx, |s| {
+            s.move_with(|_, selection| {
+                selection.collapse_to(selection.end, SelectionGoal::None);
+            });
+        })
+    }
+}
+
 fn register_editor_action<T: Action>(
     editor: &mut Editor,
     cx: &mut ViewContext<Editor>,
@@ -216,5 +273,7 @@ fn register(editor: &mut Editor, cx: &mut ViewContext<Editor>) {
     register_editor_action(editor, cx, switch_mode);
     register_editor_action(editor, cx, paste_above);
     register_editor_action(editor, cx, paste_below);
+    register_editor_action(editor, cx, move_to_beginning_of_line);
+    register_editor_action(editor, cx, move_to_end_of_line);
     register_editor_action(editor, cx, join_lines);
 }
