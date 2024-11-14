@@ -1,17 +1,18 @@
 use editor::actions::{Backspace, NewlineAbove, NewlineBelow, Paste};
 use editor::scroll::Autoscroll;
-use editor::{DisplayPoint, Editor};
-use editor::{RowExt, RowRangeExt};
-use gpui::{actions, impl_actions, AppContext, ClipboardEntry, ViewContext, WindowContext};
+use editor::{Editor, EditorEvent, RowExt, RowRangeExt};
+use gpui::{
+    actions, impl_actions, AppContext, ClipboardEntry, IntoElement, Render, Subscription,
+    ViewContext, VisualContext, WindowContext,
+};
 use gpui::{Action, KeyContext};
+use gpui::{View, WeakView};
 use language::{CursorShape, Point};
 use multi_buffer::{MultiBufferRow, ToPoint};
 use serde::Deserialize;
 use std::iter::Iterator;
 use std::ops::Range;
 use text::SelectionGoal;
-
-struct DanceTag;
 
 #[derive(Clone, Deserialize, PartialEq)]
 struct SwitchMode(String);
@@ -29,16 +30,41 @@ actions!(
     ]
 );
 
+pub(crate) struct Dance {
+    dance_mode: String,
+    editor: WeakView<Editor>,
+    _subscriptions: Vec<Subscription>,
+}
+
+// Hack: Dance intercepts events dispatched to a window and updates the view in response.
+// This means it needs a VisualContext. The easiest way to satisfy that constraint is
+// to make Dance a "View" that is just never actually rendered.
+impl Render for Dance {
+    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
+        gpui::Empty
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct DanceAddon {
+    pub(crate) view: View<Dance>,
+}
+
+impl editor::Addon for DanceAddon {
+    fn extend_key_context(&self, key_context: &mut KeyContext, cx: &AppContext) {
+        let dance_mode = &self.view.read(cx).dance_mode;
+        key_context.set("dance_mode", dance_mode.to_string())
+    }
+
+    fn to_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
 /// Initializes the `vim` crate.
 pub fn init(cx: &mut AppContext) {
     cx.observe_new_views(|editor: &mut Editor, cx| register(editor, cx))
         .detach();
-}
-
-fn make_key_context(mode: String) -> KeyContext {
-    let mut key_context = KeyContext::new_with_defaults();
-    key_context.set("dance_mode", mode.to_string());
-    key_context
 }
 
 /// this is a custom implementation of line selection:
@@ -47,7 +73,12 @@ fn make_key_context(mode: String) -> KeyContext {
 ///   AND the end of the selection sits at the very start of the next line AND the selection caret
 ///   is at the beginning of the selection. this makes the operation idempotent but also behaves like
 ///   how a user might expect
-fn select_line(editor: &mut Editor, _: &SelectLine, cx: &mut ViewContext<Editor>) {
+fn select_line(
+    _dance: &mut Dance,
+    editor: &mut Editor,
+    _: &SelectLine,
+    cx: &mut ViewContext<Editor>,
+) {
     let display_map = editor.display_map.update(cx, |map, cx| map.snapshot(cx));
     let mut selections = editor.selections.all::<Point>(cx);
     let max_point = display_map.buffer_snapshot.max_point();
@@ -91,7 +122,12 @@ fn clipboard_ends_in_newline(cx: &mut ViewContext<Editor>) -> bool {
 /// this is a custom implementation of paste that, if the clipboard contains a newline,
 /// it will paste on a newly created line above the selection instead of replacing
 /// the selection
-fn paste_above(editor: &mut Editor, _: &PasteAbove, cx: &mut ViewContext<Editor>) {
+fn paste_above(
+    _dance: &mut Dance,
+    editor: &mut Editor,
+    _: &PasteAbove,
+    cx: &mut ViewContext<Editor>,
+) {
     let ends_in_newline = clipboard_ends_in_newline(cx);
     if ends_in_newline {
         editor.newline_above(&NewlineAbove, cx);
@@ -105,7 +141,12 @@ fn paste_above(editor: &mut Editor, _: &PasteAbove, cx: &mut ViewContext<Editor>
 /// this is a custom implementation of paste that, if the clipboard contains a newline,
 /// it will paste on a newly created line below the selection instead of replacing
 /// the selection
-fn paste_below(editor: &mut Editor, _: &PasteBelow, cx: &mut ViewContext<Editor>) {
+fn paste_below(
+    _dance: &mut Dance,
+    editor: &mut Editor,
+    _: &PasteBelow,
+    cx: &mut ViewContext<Editor>,
+) {
     let ends_in_newline = clipboard_ends_in_newline(cx);
     if ends_in_newline {
         editor.newline_below(&NewlineBelow, cx);
@@ -117,7 +158,12 @@ fn paste_below(editor: &mut Editor, _: &PasteBelow, cx: &mut ViewContext<Editor>
 }
 
 /// A custom implementation of join_lines that selects the space between lines
-pub fn join_lines(editor: &mut Editor, _: &JoinLines, cx: &mut ViewContext<Editor>) {
+fn join_lines(
+    _dance: &mut Dance,
+    editor: &mut Editor,
+    _: &JoinLines,
+    cx: &mut ViewContext<Editor>,
+) {
     if editor.read_only(cx) {
         return;
     }
@@ -186,19 +232,24 @@ pub fn join_lines(editor: &mut Editor, _: &JoinLines, cx: &mut ViewContext<Edito
 }
 
 fn switch_mode(
+    dance: &mut Dance,
     editor: &mut Editor,
     &SwitchMode(ref mode): &SwitchMode,
     cx: &mut ViewContext<Editor>,
 ) {
-    editor.set_keymap_context_layer::<DanceTag>(make_key_context(mode.to_string()), cx);
-    if mode == "default" {
+    dance.dance_mode = mode.to_string();
+    sync(mode, editor, cx);
+}
+
+fn sync(dance_mode: &str, editor: &mut Editor, cx: &mut ViewContext<Editor>) {
+    if dance_mode == "default" {
         editor.set_cursor_shape(CursorShape::Bar, cx);
     } else {
         editor.set_cursor_shape(CursorShape::WideBar, cx);
     }
 }
 
-fn all_selections_are_empty(editor: &Editor, cx: &AppContext) -> bool {
+fn all_selections_are_empty(editor: &Editor, cx: &mut AppContext) -> bool {
     editor
         .selections
         .all::<usize>(cx)
@@ -207,11 +258,12 @@ fn all_selections_are_empty(editor: &Editor, cx: &AppContext) -> bool {
 }
 
 fn move_to_beginning_of_line(
+    _dance: &mut Dance,
     editor: &mut Editor,
     _: &MoveToBeginningOfLine,
     cx: &mut ViewContext<Editor>,
 ) {
-    if all_selections_are_empty(editor, &*cx) {
+    if all_selections_are_empty(editor, cx) {
         editor.move_to_beginning_of_line(
             &editor::actions::MoveToBeginningOfLine {
                 stop_at_soft_wraps: true,
@@ -227,8 +279,13 @@ fn move_to_beginning_of_line(
     }
 }
 
-fn move_to_end_of_line(editor: &mut Editor, _: &MoveToEndOfLine, cx: &mut ViewContext<Editor>) {
-    if all_selections_are_empty(editor, &*cx) {
+fn move_to_end_of_line(
+    _dance: &mut Dance,
+    editor: &mut Editor,
+    _: &MoveToEndOfLine,
+    cx: &mut ViewContext<Editor>,
+) {
+    if all_selections_are_empty(editor, cx) {
         editor.move_to_end_of_line(
             &editor::actions::MoveToEndOfLine {
                 stop_at_soft_wraps: true,
@@ -246,21 +303,40 @@ fn move_to_end_of_line(editor: &mut Editor, _: &MoveToEndOfLine, cx: &mut ViewCo
 
 fn register_editor_action<T: Action>(
     editor: &mut Editor,
-    cx: &mut ViewContext<Editor>,
-    f: fn(&mut Editor, &T, &mut ViewContext<Editor>),
+    cx: &mut ViewContext<Dance>,
+    f: fn(&mut Dance, &mut Editor, &T, &mut ViewContext<Editor>),
 ) {
-    let editor_handle = cx.view().downgrade();
+    let dance_handle = cx.view().downgrade();
     editor
         .register_action::<T>(move |mode, cx: &mut WindowContext| {
-            if let Some(editor) = editor_handle.upgrade() {
-                editor.update(cx, |editor, cx| {
-                    f(editor, mode, cx);
+            dance_handle
+                .update(cx, |dance, cx| {
+                    let Some(editor) = dance.editor.upgrade() else {
+                        return;
+                    };
+                    editor.update(cx, |editor, cx| {
+                        f(dance, editor, mode, cx);
+                    });
                 })
-            } else {
-                println!("Debug: editor handle could not be upgraded")
-            }
+                .unwrap();
         })
         .detach();
+}
+
+fn handle_editor_event<'a>(
+    this: &mut Dance,
+    editor: View<Editor>,
+    event: &EditorEvent,
+    cx: &mut ViewContext<'a, Dance>,
+) {
+    match event {
+        EditorEvent::Focused | EditorEvent::FocusedIn => {
+            editor.update(cx, |editor, cx| {
+                sync(&this.dance_mode, editor, cx);
+            });
+        }
+        _ => {}
+    }
 }
 
 fn register(editor: &mut Editor, cx: &mut ViewContext<Editor>) {
@@ -268,12 +344,24 @@ fn register(editor: &mut Editor, cx: &mut ViewContext<Editor>) {
         editor::EditorMode::Full => "action",
         _ => "default",
     };
-    switch_mode(editor, &SwitchMode(initial_mode.to_string()), cx);
-    register_editor_action(editor, cx, select_line);
-    register_editor_action(editor, cx, switch_mode);
-    register_editor_action(editor, cx, paste_above);
-    register_editor_action(editor, cx, paste_below);
-    register_editor_action(editor, cx, move_to_beginning_of_line);
-    register_editor_action(editor, cx, move_to_end_of_line);
-    register_editor_action(editor, cx, join_lines);
+    let editor_weak = cx.view().clone().downgrade();
+    let editor_view = cx.view().clone();
+    let dance = cx.new_view(|cx| Dance {
+        editor: editor_weak,
+        dance_mode: initial_mode.to_string(),
+        _subscriptions: vec![cx.subscribe(&editor_view, handle_editor_event)],
+    });
+    editor.register_addon(DanceAddon {
+        view: dance.clone(),
+    });
+    sync(initial_mode, editor, cx);
+    dance.update(cx, |_dance, cx| {
+        register_editor_action(editor, cx, select_line);
+        register_editor_action(editor, cx, switch_mode);
+        register_editor_action(editor, cx, paste_above);
+        register_editor_action(editor, cx, paste_below);
+        register_editor_action(editor, cx, move_to_beginning_of_line);
+        register_editor_action(editor, cx, move_to_end_of_line);
+        register_editor_action(editor, cx, join_lines);
+    })
 }
